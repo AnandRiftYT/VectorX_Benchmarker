@@ -1,0 +1,13 @@
+{
+  "name": "nuclear-gpu-benchmark",
+  "version": "1.0.0",
+  "author": "Anand",
+  "description": "5M Particle GPU Stress Test",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^28.0.0"
+  }
+}

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VectorX GPU Benchmark By Anand</title>
+
+<style>
+body {
+    margin: 0;
+    background: #050505;
+    color: #00ff00;
+    font-family: 'Segoe UI', monospace;
+    overflow: hidden;
+}
+
+#ui {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 10;
+    background: rgba(0,0,0,0.9);
+    padding: 20px;
+    border: 1px solid #00ff00;
+    border-radius: 8px;
+    min-width: 220px;
+}
+
+canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+}
+
+.result-screen {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+button {
+    background: #0f0;
+    color: #000;
+    padding: 15px 30px;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 1.2rem;
+    margin-top: 10px;
+}
+
+.label {
+    color: #888;
+    font-size: 0.8rem;
+}
+
+.temp-ok { color: #00ff00; }
+.temp-warn { color: #ffff00; }
+.temp-hot { color: #ff0000; }
+</style>
+</head>
+
+<body>
+
+<div id="start-screen" class="result-screen" style="display:flex;">
+<h1>VECTORX_BENCHMARK</h1>
+<p>GPU Stress Test</p>
+
+<div id="detected-gpu">Detecting Hardware...</div>
+
+
+<select id="gpu-load">
+<option value="500000">LOW (500K)</option>
+<option value="1000000">MEDIUM (1M)</option>
+<option value="2000000" selected>HIGH (2M)</option>
+<option value="5000000">EXTREME (5M)</option>
+<option value="10000000">GOOD LUCK (10M)</option>
+</select>
+
+
+
+
+<button onclick="startBenchmark()">START</button>
+</div>
+
+<div id="end-screen" class="result-screen">
+<h1 style="color:#0f0;">TEST COMPLETE</h1>
+<div id="final-stats"></div>
+<button onclick="location.reload()">RESTART</button>
+</div>
+
+<div id="ui">
+<div id="gpu-name">GPU: Detecting...</div>
+<div class="label" id="os-name">OS: Detecting...</div>
+
+<hr>
+
+<div>Time: <span id="timer">60</span>s</div>
+<div>FPS: <span id="fps">--</span></div>
+
+<hr>
+
+<div>CPU Temp: <span id="cpu-temp">--</span> °C</div>
+<div>GPU Temp: <span id="gpu-temp">--</span> °C</div>
+
+</div>
+
+<canvas id="glCanvas"></canvas>
+
+<script>
+let gl, program;
+let startTime, frameCount = 0;
+let running = false;
+const duration = 60000;
+let activeGpu = "";
+let POINT_COUNT = 2000000;
+
+document.getElementById('os-name').innerText = "OS: " + navigator.platform;
+
+window.onload = function() {
+    previewGPU();
+};
+
+function resizeCanvas(canvas, gl){
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    gl.viewport(0, 0, canvas.width, canvas.height);
+}
+
+window.addEventListener("resize", () => {
+    const canvas = document.getElementById('glCanvas');
+    if(gl) resizeCanvas(canvas, gl);
+});
+
+function getGPU() {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl');
+    if (!gl) return "WebGL Not Supported";
+    const debug = gl.getExtension('WEBGL_debug_renderer_info');
+    return debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : "Unknown GPU";
+}
+
+function previewGPU() {
+    activeGpu = getGPU();
+    document.getElementById('detected-gpu').innerText = "Hardware: " + activeGpu;
+    document.getElementById('gpu-name').innerText = "GPU: " + activeGpu;
+}
+
+const vs = `
+attribute vec4 a;
+uniform float t;
+
+void main(){
+    float ang = t + a.z;
+
+    gl_Position = vec4(
+        a.x*cos(ang)-a.z*sin(ang),
+        a.y,
+        a.x*sin(ang)+a.z*cos(ang),
+        1.0
+    );
+
+    gl_PointSize = 2.0;
+}`;
+
+const fs = `
+precision mediump float;
+
+void main(){
+    vec2 uv = gl_FragCoord.xy / vec2(800.0, 600.0);
+
+    float green = 0.5 + 0.5 * sin(uv.x * 10.0);
+    float blue  = 0.5 + 0.5 * cos(uv.y * 10.0);
+
+    gl_FragColor = vec4(0.0, green, blue, 1.0);
+}
+`;
+
+function initShader(gl) {
+    function compile(type, src){
+        let s = gl.createShader(type);
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        return s;
+    }
+
+    let p = gl.createProgram();
+    gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));
+    gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(p);
+    return p;
+}
+
+async function startBenchmark(){
+    document.getElementById('start-screen').style.display='none';
+
+    POINT_COUNT = parseInt(document.getElementById('gpu-load').value);
+
+    const canvas = document.getElementById('glCanvas');
+    gl = canvas.getContext('webgl');
+
+    resizeCanvas(canvas, gl);
+
+    gl.clearColor(0,0,0,1);
+
+    program = initShader(gl);
+
+    activeGpu = getGPU();
+    document.getElementById('gpu-name').innerText = "GPU: " + activeGpu;
+
+    const data = new Float32Array(POINT_COUNT * 3);
+
+    for(let i=0;i<data.length;i++)
+        data[i]=(Math.random()-0.5)*2;
+
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+
+    const loc = gl.getAttribLocation(program,'a');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc,3,gl.FLOAT,false,0,0);
+
+    running = true;
+    startTime = performance.now();
+    render();
+}
+
+function render(){
+    if(!running) return;
+
+    let now = performance.now();
+    let elapsed = now - startTime;
+
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.useProgram(program);
+    gl.uniform1f(gl.getUniformLocation(program,'t'), elapsed/1000);
+
+    gl.drawArrays(gl.POINTS,0,POINT_COUNT); 
+
+    frameCount++;
+
+    document.getElementById('timer').innerText = Math.max(0,(60 - elapsed/1000)).toFixed(1);
+
+    if(elapsed < duration){
+        requestAnimationFrame(render);
+    } else {
+        finish();
+    }
+}
+
+function finish(){
+    running=false;
+
+    const fps = (frameCount/60).toFixed(1);
+    const score = Math.round(fps*400);
+
+    document.getElementById('end-screen').style.display='flex';
+    document.getElementById('final-stats').innerHTML = `
+        GPU: ${activeGpu}<br>
+        FPS: ${fps}<br>
+        SCORE: ${score}
+    `;
+}
+
+setInterval(()=>{
+    if(running){
+        let sec = (performance.now()-startTime)/1000;
+        document.getElementById('fps').innerText = Math.round(frameCount/sec);
+    }
+},500);
+</script>
+
+</body>
+</html>
