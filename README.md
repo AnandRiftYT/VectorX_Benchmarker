@@ -1,4 +1,4 @@
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/AnandRiftYT/VectorX_Benchmarker?color=green&label=Version)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/AnandRiftYT/VectorX_Benchmarker?color=blue&label=Version)
 
 # VectorX_Benchmarker
 # 🚀 VectorX GPU Benchmark
