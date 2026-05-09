@@ -8,7 +8,9 @@ VectorX is a high-performance, lightweight GPU benchmarking tool built with **El
 * **Cross-Platform Logic:** Optimized for Linux and Windows.
 * **Low-Level Handshake:** Custom WebGL rendering pipeline designed.
 
+### [📥 Download Latest Release](https://github.com/AnandRiftYT/VectorX_Benchmarker/releases/latest)
+
 
 ### 🛠️ Installation
-1. Download the .zip file for your OS from **Releases** Folder 
+1. Download the .zip file for your respective OS from **Releases** Folder 
 3. Extract the File and run VectorxBenchmark.
